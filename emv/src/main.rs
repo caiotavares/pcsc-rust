@@ -1,15 +1,52 @@
+extern crate pcsc;
+
 use pcsc::*;
 
+// APDUs
+pub const SELECT:       &[u8] = b"\x00\xA4\x04\x00";
+pub const GET_RESPONSE: &[u8] = b"\xA0\xC0\x00\x00";
+
+// AIDs
+pub const MASTERCARD_DEBIT:  &[u8] = b"\xA0\x00\x00\x00\x04\x30\x60";
+pub const MASTERCARD_CREDIT: &[u8] = b"\xA0\x00\x00\x00\x04\x10\x10";
+
 fn main() {
-    let _card = connect();
+    let card = connect();
+    match card {
+        Some(c) => send_apdu(c, &[SELECT, b"\x07", MASTERCARD_CREDIT].concat()),
+        None => {}
+    }
 }
 
-pub enum ApduCommands {}
+fn send_apdu(card: Card, apdu: &[u8]) {
+    // Send an APDU command.
 
-pub enum TLV {}
+    println!("Sending APDU: {:02X?}", apdu);
+    let mut rapdu_buf = [0; MAX_BUFFER_SIZE];
+    let status = match card.transmit(apdu, &mut rapdu_buf) {
+        Ok(rapdu) => rapdu,
+        Err(err) => {
+            eprintln!("Failed to transmit APDU command to card: {}", err);
+            std::process::exit(1);
+        }
+    };
 
+    println!("Status Code: {:02X?}", status);
 
-fn connect() -> Option<Card>  {
+    // TODO: Get the response length from status code and set the resp_buf to it's size
+
+    let mut resp_buf = [0; MAX_BUFFER_SIZE];
+    let response = match card.transmit(&[GET_RESPONSE, b"\x52"].concat(), &mut resp_buf) {
+        Ok(resp) => resp,
+        Err(err) => {
+            eprintln!("Failed to transmit APDU command to card: {}", err);
+            std::process::exit(1);
+        }
+    };
+    println!("Response: {:02X?}", response)
+}
+
+fn connect() -> Option<Card> {
     let ctx = match Context::establish(Scope::User) {
         Ok(ctx) => ctx,
         Err(err) => {
@@ -43,7 +80,7 @@ fn connect() -> Option<Card>  {
         Ok(card) => Some(card),
         Err(Error::NoSmartcard) => {
             println!("A smartcard is not present in the reader.");
-            return None
+            return None;
         }
         Err(err) => {
             eprintln!("Failed to connect to card: {}", err);
