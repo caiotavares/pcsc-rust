@@ -1,9 +1,15 @@
-extern crate pcsc;
-
 use pcsc::*;
 
 fn main() {
-    // Establish a PC/SC context.
+    let _card = connect();
+}
+
+pub enum ApduCommands {}
+
+pub enum TLV {}
+
+
+fn connect() -> Option<Card>  {
     let ctx = match Context::establish(Scope::User) {
         Ok(ctx) => ctx,
         Err(err) => {
@@ -27,34 +33,21 @@ fn main() {
         Some(reader) => reader,
         None => {
             println!("No readers are connected.");
-            return;
+            return None;
         }
     };
     println!("Using reader: {:?}", reader);
 
-    // Connect to the card.
-    let card = match ctx.connect(reader, ShareMode::Shared, Protocols::ANY) {
-        Ok(card) => card,
+    // Connect to the card and return it.
+    match ctx.connect(reader, ShareMode::Shared, Protocols::ANY) {
+        Ok(card) => Some(card),
         Err(Error::NoSmartcard) => {
             println!("A smartcard is not present in the reader.");
-            return;
+            return None
         }
         Err(err) => {
             eprintln!("Failed to connect to card: {}", err);
             std::process::exit(1);
         }
-    };
-
-    // Send an APDU command.
-    let apdu = b"\x00\xa4\x04\x00\x0A\xA0\x00\x00\x00\x62\x03\x01\x0C\x06\x01";
-    println!("Sending APDU: {:02X?}", apdu);
-    let mut rapdu_buf = [0; MAX_BUFFER_SIZE];
-    let rapdu = match card.transmit(apdu, &mut rapdu_buf) {
-        Ok(rapdu) => rapdu,
-        Err(err) => {
-            eprintln!("Failed to transmit APDU command to card: {}", err);
-            std::process::exit(1);
-        }
-    };
-    println!("APDU response: {:02X?}", rapdu);
+    }
 }

@@ -1,2 +1,2 @@
 [workspace]
-members = ["pcsc", "pcsc-sys"]
+members = ["pcsc", "pcsc-sys", "emv"]
